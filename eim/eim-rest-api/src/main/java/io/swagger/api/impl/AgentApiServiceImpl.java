@@ -32,6 +32,7 @@ import io.elastest.eim.config.Dictionary;
 import io.elastest.eim.config.Properties;
 import io.elastest.eim.database.AgentConfigurationRepository;
 import io.elastest.eim.database.AgentRepository;
+import io.elastest.eim.database.mysql.EimDbManager;
 import io.elastest.eim.templates.BeatsTemplateManager;
 import io.elastest.eim.templates.SshTemplateManager;
 import io.elastest.eim.utils.FileTextUtils;
@@ -39,7 +40,6 @@ import io.swagger.api.AgentApiService;
 import io.swagger.api.ApiResponseMessage;
 import io.swagger.api.NotFoundException;
 import io.swagger.model.AgentConfiguration;
-import io.swagger.model.AgentConfigurationDatabase;
 import io.swagger.model.AgentDeleted;
 import io.swagger.model.AgentFull;
 import io.swagger.model.Host;
@@ -48,15 +48,17 @@ public class AgentApiServiceImpl extends AgentApiService {
 
 	private static Logger logger = Logger.getLogger(AgentApiServiceImpl.class);
 
-	private AgentRepository agentDb = new AgentRepository();
-	private AgentConfigurationRepository agentCfgDb = new AgentConfigurationRepository();
+//	private AgentRepository agentDb = new AgentRepository();
+//	private AgentConfigurationRepository agentCfgDb = new AgentConfigurationRepository();
+	private EimDbManager dbManager = new EimDbManager();
 	
 	private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy.MM.dd-HH.mm.ss");
 	
     @Override
     public Response deleteAgentByID(String agentId, SecurityContext securityContext) throws NotFoundException {
         //verify that agent exists
-    	AgentFull agent = agentDb.getAgentByAgentId(agentId);
+//    	AgentFull agent = agentDb.getAgentByAgentId(agentId);
+    	AgentFull agent = dbManager.getAgentByAgentId(agentId);
     	int status = 0;
     	Timestamp timestamp = new Timestamp(System.currentTimeMillis());
     	String executionDate = sdf.format(timestamp);
@@ -71,7 +73,8 @@ public class AgentApiServiceImpl extends AgentApiService {
 	            	logger.info("Successful execution for the delete script generated to agent " + agent.getAgentId());
 	            	
 	            	//delete agent configuration
-	            	boolean deleted = agentCfgDb.deleteAgentCfg(agentId);
+//	            	boolean deleted = agentCfgDb.deleteAgentCfg(agentId);
+	            	boolean deleted = dbManager.deleteAgentConfiguration(agentId);
 	        		if (deleted) {
 	        			logger.info("Successful deleted from database -->  agent configuration" + agent.getAgentId());
 	        			//return Response.ok().entity(agent).build();	        		
@@ -114,7 +117,8 @@ public class AgentApiServiceImpl extends AgentApiService {
     		
     		
     		//delete from db
-    		boolean deleted = agentDb.deleteAgent(agentId);
+//    		boolean deleted = agentDb.deleteAgent(agentId);
+    		boolean deleted = dbManager.deleteAgent(agentId);
     		if (deleted) {
     			logger.info("Successful deleted from database -->  agent " + agent.getAgentId());
     			//return Response.ok().entity(agent).build();
@@ -152,7 +156,8 @@ public class AgentApiServiceImpl extends AgentApiService {
     
     @Override
     public Response getAgentByID(String agentId, SecurityContext securityContext) throws NotFoundException {
-    	AgentFull agent = agentDb.getAgentByAgentId(agentId);
+//    	AgentFull agent = agentDb.getAgentByAgentId(agentId);
+    	AgentFull agent = dbManager.getAgentByAgentId(agentId);
         if (agent != null){
     		return Response.ok().entity(agent).build();
         }
@@ -164,7 +169,8 @@ public class AgentApiServiceImpl extends AgentApiService {
     
     @Override
     public Response getAllAgents(SecurityContext securityContext) throws NotFoundException {
-    	List<AgentFull> agents = agentDb.findAll();
+//    	List<AgentFull> agents = agentDb.findAll();
+    	List<AgentFull> agents = dbManager.getAgents();
         if (agents != null){
     		return Response.ok().entity(agents).build();
         }
@@ -178,7 +184,8 @@ public class AgentApiServiceImpl extends AgentApiService {
     	
     	if (actionId.equals("monitor")){
 	    	//verify that agent exists in database and it is not monitored
-	    	AgentFull agent = agentDb.getAgentByAgentId(agentId);
+//	    	AgentFull agent = agentDb.getAgentByAgentId(agentId);
+    		AgentFull agent = dbManager.getAgentByAgentId(agentId);
 	    	if (agent == null) {
 	    		//agent not exists in db
 	    		logger.error("No exists any agent in the system with agentId " + agentId);
@@ -201,9 +208,11 @@ public class AgentApiServiceImpl extends AgentApiService {
 	            if (status == 0) {
 	            	logger.info("Successful execution for the beats script generated to agent " + agent.getAgentId());
 	            	// store agent configuration in db
-	            	agentCfgDb.addAgentCfg(agentId, body);
+//	            	agentCfgDb.addAgentCfg(agentId, body);
+	            	dbManager.addAgentCfg(agentId, body);
 	            	//set host as monitored in db    	
-		        	agent = agentDb.setMonitored(agentId, true);
+//		        	agent = agentDb.setMonitored(agentId, true);
+	            	agent = dbManager.setMonitored(agentId, true);
 		        	logger.info("iAgent " + agent.getAgentId() + " monitored succesfully");
 		          	return Response.ok().entity(agent).build();
 	            }
@@ -225,7 +234,8 @@ public class AgentApiServiceImpl extends AgentApiService {
     public Response postAgent(Host body, SecurityContext securityContext) throws NotFoundException {
         
     	
-    	if (agentDb.existHost(body.getAddress())){
+//    	if (agentDb.existHost(body.getAddress())){
+    	if (dbManager.getAgentByIpAddress(body.getAddress()) != null){
     		return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(new ApiResponseMessage(ApiResponseMessage.ERROR, "not inserted! The host exists in database")).build();
     	} else {
 			try {
@@ -235,7 +245,8 @@ public class AgentApiServiceImpl extends AgentApiService {
 				}
 				else {
 					int status = -1;
-					AgentFull agent = agentDb.addHost(body);
+//					AgentFull agent = agentDb.addHost(body);
+					AgentFull agent = dbManager.addHost(body);
 			        if (agent != null){
 			        	//create folder for host with the name of the agentId
 			        	new File(Properties.getValue(Dictionary.PROPERTY_TEMPLATES_SSH_EXECUTIONPATH) + 
@@ -295,7 +306,8 @@ public class AgentApiServiceImpl extends AgentApiService {
 			            }
 			            else {
 			            	//delete from DB
-			            	agentDb.deleteAgent(agent.getAgentId());
+//			            	agentDb.deleteAgent(agent.getAgentId());
+			            	dbManager.deleteAgent(agent.getAgentId());
 			            	//remove from ansible.cfg file
 			            	FileTextUtils.removeAgentFromAnsibleCfg("/etc/ansible/hosts", agent.getAgentId());
 			            	logger.error("ERROR executing the script for agent " + agent.getAgentId() + ". Check logs please");

@@ -711,5 +711,36 @@ public class EimDbManager {
     	}
     	return inserted;
 	}
+	
+	
+	public AgentFull getAgentByIpAddress(String ipAddress) {
+    	AgentFull agent = null;
+    	Connection conn = null;
+    	try {
+    		
+    		conn = getConnection();
+    		agent = getAgentByIpAddress(conn, ipAddress);
+    		if (agent != null) {
+    			return agent;
+    		}
+    		else {
+				logger.info("Agent with agentId = " + ipAddress + " exists in database");
+    			return null;
+    		}
+    		
+    	} catch (SQLException ex) {
+            logger.error("Error " + ex.getErrorCode() + ": " + ex.getMessage());
+        }
+    	finally {
+    		try{
+    			if(conn!=null)
+    				conn.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return agent;
+    }
     
 }

@@ -21,6 +21,7 @@ import javax.ws.rs.core.SecurityContext;
 import org.apache.log4j.Logger;
 
 import io.elastest.eim.database.AgentConfigurationRepository;
+import io.elastest.eim.database.mysql.EimDbManager;
 import io.swagger.api.AgentconfigurationApiService;
 import io.swagger.api.ApiResponseMessage;
 import io.swagger.api.NotFoundException;
@@ -30,12 +31,14 @@ public class AgentconfigurationApiServiceImpl extends AgentconfigurationApiServi
    
 	private static Logger logger = Logger.getLogger(AgentApiServiceImpl.class);
 
-	private AgentConfigurationRepository agentCfgDb = new AgentConfigurationRepository();
+//	private AgentConfigurationRepository agentCfgDb = new AgentConfigurationRepository();
+	private EimDbManager dbManager = new EimDbManager();
 
 	
 	@Override
     public Response getAgentCfgByID(String agentId, SecurityContext securityContext) throws NotFoundException {
-		AgentConfigurationDatabase agent = agentCfgDb.getAgentConfigurationByAgentId(agentId);
+//		AgentConfigurationDatabase agent = agentCfgDb.getAgentConfigurationByAgentId(agentId);
+		AgentConfigurationDatabase agent = dbManager.getAgentConfigurationByAgentId(agentId);
         if (agent != null){
     		return Response.ok().entity(agent).build();
         }
@@ -47,7 +50,8 @@ public class AgentconfigurationApiServiceImpl extends AgentconfigurationApiServi
 	
     @Override
     public Response getAllAgentConfigurations(SecurityContext securityContext) throws NotFoundException {
-    	List<AgentConfigurationDatabase> agents = agentCfgDb.findAll();
+//    	List<AgentConfigurationDatabase> agents = agentCfgDb.findAll();
+    	List<AgentConfigurationDatabase> agents = dbManager.getAgentConfigurations();
         if (agents != null){
     		return Response.ok().entity(agents).build();
         }
