@@ -21,7 +21,7 @@ CREATE TABLE `agent` (
 
 DROP TABLE IF EXISTS `agent_configuration`;
 
-CREATE TABLE `agentconfiguration` (
+CREATE TABLE `agent_configuration` (
   `agent_id` varchar(255) NOT NULL,
   `exec` varchar(255) NOT NULL,
   `component` varchar(255) NOT NULL,
