@@ -1,3 +1,16 @@
+/**
+ * Copyright (c) 2017 Atos
+ * This program and the accompanying materials
+ * are made available under the terms of the Apache License v2.0
+ * which accompanies this distribution, and is available at
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Contributors:
+ *    @author David Rojo Antona (Atos)
+ *    
+ * Developed in the context of ElasTest EU project http://elastest.io 
+ */
+
 package io.elastest.eim.database.mysql;
 
 import java.sql.Connection;
@@ -11,6 +24,11 @@ import java.util.List;
 import org.apache.log4j.Logger;
 
 import io.elastest.eim.database.AgentRepository;
+import io.swagger.model.AgentConfiguration;
+import io.swagger.model.AgentConfigurationDatabase;
+import io.swagger.model.AgentConfigurationFilebeat;
+import io.swagger.model.AgentConfigurationPacketbeat;
+import io.swagger.model.AgentConfigurationTopbeat;
 import io.swagger.model.AgentFull;
 import io.swagger.model.Host;
 
@@ -70,7 +88,7 @@ public class EimDbManager {
 	}
     
     private boolean existsAgent(Connection conn, String agentId) throws SQLException {
-    	String sqlSearchIagent = "SELECT iagent FROM agent WHERE codigo=?";
+    	String sqlSearchIagent = "SELECT AGENT_ID FROM AGENT WHERE AGENT_ID=?";
 		PreparedStatement pstSearchIagent = conn.prepareStatement(sqlSearchIagent);
 		pstSearchIagent.setString(1, agentId);
 		ResultSet rs = pstSearchIagent.executeQuery();
@@ -89,7 +107,7 @@ public class EimDbManager {
     		
     		conn = getConnection();
     		
-    		if (!existsAgent(conn, host.getAddress())) {
+    		if (getAgentByIpAddress(conn, host.getAddress()) != null) {
     			agent = addHost(conn, host);
     			return agent;
     		}
@@ -274,10 +292,424 @@ public class EimDbManager {
 		return agents;
 	}
 	
+	public AgentFull setMonitored(String agentId, boolean monitored) {
+		AgentFull agent = null;
+    	Connection conn = null;
+    	try {
+    		
+    		conn = getConnection();
+    		
+    		if (existsAgent(conn,agentId)) {
+    			agent = setMonitored(conn, agentId, monitored);
+    			return agent;
+    		}
+    		else { 
+    			logger.info("Agent with agentId = " + agentId + " does not exists in database");
+    			return null;
+    		}
+    		
+    	} catch (SQLException ex) {
+            logger.error("Error " + ex.getErrorCode() + ": " + ex.getMessage());
+        }
+    	finally {
+    		try{
+    			if(conn!=null)
+    				conn.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return agent;
+	}
+
+	private AgentFull setMonitored(Connection conn, String agentId, boolean monitored) throws SQLException {
+		logger.info("Setting monitored = " + monitored + "the agent with agentId = " + agentId + " in DB");
+		System.out.println("Setting monitored = " + monitored + "the agent with agentId = " + agentId + " in DB");
+		PreparedStatement pstUpdatedMonitored = null;
+		
+		try {
+ 			String updateSQL = "UPDATE AGENT SET MONITORED = ? WHERE AGENT_ID = ?";
+			pstUpdatedMonitored = conn.prepareStatement(updateSQL);
+			String strMonitored = "false";
+			if (monitored) 
+				strMonitored = "true";
+			pstUpdatedMonitored.setString(1, strMonitored);
+			pstUpdatedMonitored.setString(2, agentId);
+			int updatedRows = pstUpdatedMonitored.executeUpdate(updateSQL);
+			if (updatedRows == 1) {
+				return getAgentByAgentId(conn, agentId);
+			}
+			else {
+				logger.error(updatedRows + " rows has been updated when trying to set monitored = " + strMonitored + " for agent " + agentId);
+				return null;
+			}
+		}
+		finally {
+    		try{
+    			if(pstUpdatedMonitored!=null)
+    				pstUpdatedMonitored.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+	}
+	
+	
+	public boolean deleteAgent(String agentId) {
+
+		Connection conn = null;
+    	try {
+    		
+    		conn = getConnection();
+    		return deleteAgent(conn, agentId);
+    		
+    	} catch (SQLException ex) {
+            logger.error("Error " + ex.getErrorCode() + ": " + ex.getMessage());
+        }
+    	finally {
+    		try{
+    			if(conn!=null)
+    				conn.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return false;
+	}
+	
+	private boolean deleteAgent(Connection conn, String agentId) throws SQLException {
+		logger.info("Deleting agent agentId = " + agentId + "...");
+		System.out.println("Deleting agent agentId = " + agentId + "...");
+		PreparedStatement pstDeleteAgent = null;
+		
+		try {
+ 			String deleteSQL = "DELETE FROM AGENT WHERE AGENT_ID = ?";
+			pstDeleteAgent = conn.prepareStatement(deleteSQL);
+			pstDeleteAgent.setString(1, agentId);
+
+			int deletedRows = pstDeleteAgent.executeUpdate();
+			if (deletedRows == 1) {
+				return true;
+			}
+			else {
+				logger.error(deletedRows + " rows has been removed when trying to delete agent with agentId = " + agentId);
+				return false;
+			}
+		}
+		finally {
+    		try{
+    			if(pstDeleteAgent!=null)
+    				pstDeleteAgent.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+	}
+	
+	public List<AgentFull> getAgents() {
+    	
+    	Connection conn = null;
+    	try {
+    		
+    		conn = getConnection();
+    		return getAgents(conn);
+    		
+    	} catch (SQLException ex) {
+            logger.error("Error " + ex.getErrorCode() + ": " + ex.getMessage());
+        }
+    	finally {
+    		try{
+    			if(conn!=null)
+    				conn.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return null;
+    }
+	
+	
 	//TODO
-	//setMonitored
-	//deleteAgent
 	//agentConfigurationRepo
 	
+	public AgentConfigurationDatabase getAgentConfigurationByAgentId(String agentId){
+		
+		AgentConfigurationDatabase agentCfgDb = null;
+    	Connection conn = null;
+    	try {
+    		
+    		conn = getConnection();
+    		return getAgentConfigurationByAgentId(conn, agentId);
+    		
+    	} catch (SQLException ex) {
+            logger.error("Error " + ex.getErrorCode() + ": " + ex.getMessage());
+        }
+    	finally {
+    		try{
+    			if(conn!=null)
+    				conn.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return agentCfgDb;
+			
+	}
+
+	private AgentConfigurationDatabase getAgentConfigurationByAgentId(Connection conn, String agentId) throws SQLException {
+		logger.info("Searching host in DB with agentId = " + agentId);
+		System.out.println("Searching host in DB with agentId = " + agentId);
+		AgentConfigurationDatabase agentCfg = null;
+		PreparedStatement pstSelectAgentCfg = null;
+		
+		try {
+			String selectSQL = "SELECT AGENT_ID, EXEC, COMPONENT, "
+					+ "PACKETBEAT_STREAM, TOPBEAT_STREAM, FILEBEAT_STREAM, "
+					+ "FILEBEAT_PATHS "
+					+ "FROM AGENT_CONFIGURATION "
+					+ "WHERE AGENT_ID = ?";
+			pstSelectAgentCfg = conn.prepareStatement(selectSQL);
+			pstSelectAgentCfg.setString(1, agentId);
+			ResultSet rs = pstSelectAgentCfg.executeQuery(selectSQL );
+			while (rs.next()) {
+				
+				logger.info("Agent cfg finded in DB with agentId = " + agentId + " with ID " + agentId);
+	        	System.out.println("Agent cfg finded in DB with agentId = " + agentId + " with ID " + agentId);
+				return this.toAgentCfgDbObject(rs);
+			}
+		}
+		finally {
+    		try{
+    			if(pstSelectAgentCfg!=null)
+    				pstSelectAgentCfg.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return agentCfg;
+
+	}
+	
+	private AgentConfigurationDatabase toAgentCfgDbObject(ResultSet rs) throws SQLException {
+		AgentConfigurationDatabase agentCfgDb = new AgentConfigurationDatabase();
+		agentCfgDb.setAgentId(rs.getString("AGENT_ID"));
+
+		AgentConfiguration ac = new AgentConfiguration();
+		
+		ac.setExec(rs.getString("EXEC"));
+    	ac.setComponent(rs.getString("COMPONENT"));
+    	
+    	AgentConfigurationPacketbeat packetbeat = new AgentConfigurationPacketbeat();
+    	packetbeat.setStream(rs.getString("PACKETBEAT_STREAM"));
+    	ac.setPacketbeat(packetbeat);
+    	
+    	AgentConfigurationTopbeat topbeat = new AgentConfigurationTopbeat();
+    	packetbeat.setStream(rs.getString("TOPBEAT_STREAM"));
+    	ac.setTopbeat(topbeat);
+    	
+    	AgentConfigurationFilebeat filebeat = new AgentConfigurationFilebeat();
+    	filebeat.setStream(rs.getString("FILEBEAT_STREAM"));
+    	List<String> pathsList = new ArrayList<String>();
+    	String strPaths = rs.getString("FILEBEAT_PATHS");
+    	String[] paths = strPaths.split(",");
+    	for (String path : paths) {
+    		pathsList.add(path);
+    	}
+    	filebeat.setPaths(pathsList);
+    	ac.setFilebeat(filebeat);
+
+    	agentCfgDb.setAgentConfiguration(ac);		
+		return agentCfgDb;		
+	}
+	
+	
+	private List<AgentConfigurationDatabase> getAgentConfigurations(Connection conn) throws SQLException{
+		logger.info("Searching agent configurations in DB");
+		System.out.println("Searching agent configurations in DB");
+		List<AgentConfigurationDatabase> agents = null;
+		PreparedStatement pstSelectAgentCfgs = null;
+		
+		try {
+			String selectSQL = "SELECT AGENT_ID, EXEC, COMPONENT, "
+					+ "PACKETBEAT_STREAM, TOPBEAT_STREAM, FILEBEAT_STREAM, "
+					+ "FILEBEAT_PATHS "
+					+ "FROM AGENT_CONFIGURATION";
+			pstSelectAgentCfgs = conn.prepareStatement(selectSQL);
+			ResultSet rs = pstSelectAgentCfgs.executeQuery(selectSQL);
+			agents = new ArrayList<AgentConfigurationDatabase>();
+			while (rs.next()) {
+	        	agents.add(this.toAgentCfgDbObject(rs));
+			}
+		}
+		finally {
+    		try{
+    			if(pstSelectAgentCfgs!=null)
+    				pstSelectAgentCfgs.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return agents;
+	}
+	
+	public List<AgentConfigurationDatabase> getAgentConfigurations(){
+		
+		List<AgentConfigurationDatabase> agentCfgDb = null;
+    	Connection conn = null;
+    	try {
+    		
+    		conn = getConnection();
+    		return getAgentConfigurations(conn);
+    		
+    	} catch (SQLException ex) {
+            logger.error("Error " + ex.getErrorCode() + ": " + ex.getMessage());
+        }
+    	finally {
+    		try{
+    			if(conn!=null)
+    				conn.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return agentCfgDb;
+			
+	}
+	
+	
+	public boolean deleteAgentConfiguration(String agentId) {
+
+		Connection conn = null;
+    	try {
+    		
+    		conn = getConnection();
+    		return deleteAgentConfiguration(conn, agentId);
+    		
+    	} catch (SQLException ex) {
+            logger.error("Error " + ex.getErrorCode() + ": " + ex.getMessage());
+        }
+    	finally {
+    		try{
+    			if(conn!=null)
+    				conn.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return false;
+	}
+	
+	
+	private boolean deleteAgentConfiguration(Connection conn, String agentId) throws SQLException {
+		logger.info("Deleting agent cfg for agentId = " + agentId + "...");
+		System.out.println("Deleting agent cfg for agentId = " + agentId + "...");
+		PreparedStatement pstDeleteAgentCfg = null;
+		
+		try {
+ 			String deleteSQL = "DELETE FROM AGENT_CONFIGURATION WHERE AGENT_ID = ?";
+ 			pstDeleteAgentCfg = conn.prepareStatement(deleteSQL);
+ 			pstDeleteAgentCfg.setString(1, agentId);
+
+			int deletedRows = pstDeleteAgentCfg.executeUpdate();
+			if (deletedRows == 1) {
+				return true;
+			}
+			else {
+				logger.error(deletedRows + " rows has been removed when trying to delete agent cfg with agentId = " + agentId);
+				return false;
+			}
+		}
+		finally {
+    		try{
+    			if(pstDeleteAgentCfg!=null)
+    				pstDeleteAgentCfg.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+	}
+	
+	public AgentConfigurationDatabase addAgentCfg(String agentId, AgentConfiguration agentCfgObj){
+		AgentConfigurationDatabase agentCfgDb = null;
+    	Connection conn = null;
+    	try {
+    		
+    		conn = getConnection();
+    		
+    		if (getAgentConfigurationByAgentId(conn, agentId) != null) {
+    			agentCfgDb = addAgentCfg(conn, agentId, agentCfgObj);
+    			return agentCfgDb;
+    		}
+    		else { 
+    			logger.info("Agent with agentId = " + agentId + " exists in database");
+    			return null;
+    		}
+    		
+    	} catch (SQLException ex) {
+            logger.error("Error " + ex.getErrorCode() + ": " + ex.getMessage());
+        }
+    	finally {
+    		try{
+    			if(conn!=null)
+    				conn.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+		return agentCfgDb;
+	}
+
+	private AgentConfigurationDatabase addAgentCfg(Connection conn, String agentId, AgentConfiguration agentCfgObj) throws SQLException {
+		AgentConfigurationDatabase inserted = null;
+    	PreparedStatement pstInsertHost = null;
+    	try {
+    		logger.info("Adding new agent cfg to DB, agent with agentId = " + agentId);
+    		System.out.println("Adding new agent cfg to DB, agent with agentId = " + agentId);
+    		
+    		String sqlInsertAgentCfg = "INSERT INTO AGENT_CONFIGURATION VALUES (?,?,?,?,?,?,?)";
+    		pstInsertHost = conn.prepareStatement(sqlInsertAgentCfg);
+    	
+    		pstInsertHost.setString(1, agentId);
+    		pstInsertHost.setString(2, agentCfgObj.getExec());
+    		pstInsertHost.setString(3, agentCfgObj.getComponent());
+    		pstInsertHost.setString(4, agentCfgObj.getPacketbeat().getStream());
+    		pstInsertHost.setString(5, agentCfgObj.getTopbeat().getStream());
+    		pstInsertHost.setString(6, agentCfgObj.getFilebeat().getStream());
+    		List<String> pathsList = agentCfgObj.getFilebeat().getPaths();
+    		String strPaths = "";
+    		for (String path : pathsList) {
+    			strPaths += path + ",";
+    		}
+    		strPaths = strPaths.substring(0, strPaths.length()-1);
+    		pstInsertHost.setString(7, strPaths);
+    		pstInsertHost.executeUpdate();
+    		logger.info("Agent cfg inserted in database for agentId = " + agentId);
+    		
+    		inserted = getAgentConfigurationByAgentId(conn, agentId);
+    		
+    	}
+		finally {
+    		try{
+    			if(pstInsertHost!=null)
+    				pstInsertHost.close();
+    		} catch(SQLException se){
+    			logger.error(se.getMessage());
+    			se.printStackTrace();
+    		}
+    	}
+    	return inserted;
+	}
     
 }
